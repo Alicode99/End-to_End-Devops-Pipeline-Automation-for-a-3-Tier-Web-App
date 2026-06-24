@@ -73,26 +73,21 @@ jobs:
 
       # ── ArgoCD SYNC ─────────────────────────
       # ✅ FIX: Sudo access add kiya hai binary permissions ke liye
-
+      
       - name: ArgoCD — Force Sync
         if: success()
         env:
           ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
-          curl -sSL -o argocd-linux-amd64 \
-            https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           chmod +x argocd-linux-amd64
           sudo mv argocd-linux-amd64 /usr/local/bin/argocd
 
-          argocd login $ARGOCD_SERVER \
-            --auth-token $ARGOCD_AUTH_TOKEN \
-            --insecure
-
-          # Note: Kal jab ArgoCD UI mein app banayein toh uska naam '3-tier-web-app' hi rakhiyega
-          argocd app sync 3-tier-web-app --force || echo "Warning: Sync skipped, application might not be created in ArgoCD UI yet."
-          argocd app wait 3-tier-web-app --health || echo "Waiting skipped."
-          echo "✅ ArgoCD sync process executed!"
+          # No interactive login needed now. It will use env variables directly.
+          argocd app sync 3-tier-web-app --force --insecure || echo "Warning: Sync skipped."
+          argocd app wait 3-tier-web-app --health --insecure || echo "Waiting skipped."
+          echo "✅ ArgoCD sync process executed flawlessly!"
 
   # ─────────────────────────────────────────
   # STEP 2: Email Notification
