@@ -38,10 +38,14 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── UPDATE K8s YAML FILES ───────────────
-      # ✅ FIX: Image names ko ci.yml wale original names se match kar diya hai
+      # Smart Validation lagayi hai taake pata chale file exist karti bhi hai ya nahi
 
       - name: Update Backend Image Tag in Kubernetes YAML
         run: |
+          if [ ! -f kubernetes/backend.yaml ]; then
+            echo "❌ ERROR: kubernetes/backend.yaml not found!"
+            exit 1
+          fi
           sed -i -e "s|${{ secrets.DOCKER_USERNAME }}/wanderlust-backend-beta:.*|${{ secrets.DOCKER_USERNAME }}/wanderlust-backend-beta:${{ github.event.inputs.BACKEND_DOCKER_TAG }}|g" \
             kubernetes/backend.yaml
           echo "✅ backend.yaml updated:"
@@ -49,12 +53,17 @@ jobs:
 
       - name: Update Frontend Image Tag in Kubernetes YAML
         run: |
+          if [ ! -f kubernetes/frontend.yaml ]; then
+            echo "❌ ERROR: kubernetes/frontend.yaml not found!"
+            exit 1
+          fi
           sed -i -e "s|${{ secrets.DOCKER_USERNAME }}/wanderlust-frontend-beta:.*|${{ secrets.DOCKER_USERNAME }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }}|g" \
             kubernetes/frontend.yaml
           echo "✅ frontend.yaml updated:"
           grep "image:" kubernetes/frontend.yaml
 
-      # ── GIT PUSH ────────────────────────────
+      # ── GIT PUSH WITH CONDITIONAL FIX ───────
+      # 🛠️ SMART FIX: Agar tags same honge aur koi change nahi hoga, toh yeh crash hone ke bajay bypass kar dega.
 
       - name: Commit and Push Updated Manifests
         run: |
@@ -66,13 +75,15 @@ jobs:
 
           git add kubernetes/backend.yaml kubernetes/frontend.yaml
 
-          git commit -m "ci: update image tags | frontend=${{ github.event.inputs.FRONTEND_DOCKER_TAG }} backend=${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
-
-          git push https://${{ secrets.GH_TOKEN }}@github.com/Alicode99/End-to_End-Devops-Pipeline-Automation-for-a-3-Tier-Web-App.git main
-          echo "✅ Manifests pushed — ArgoCD will auto-detect and deploy to EKS"
+          if git diff --cached --quiet; then
+            echo "⚠️ No changes detected in manifests (already up-to-date with these tags). Skipping commit."
+          else
+            git commit -m "ci: update image tags | frontend=${{ github.event.inputs.FRONTEND_DOCKER_TAG }} backend=${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+            git push https://${{ secrets.GH_TOKEN }}@github.com/Alicode99/End-to_End-Devops-Pipeline-Automation-for-a-3-Tier-Web-App.git main
+            echo "✅ Manifests pushed — ArgoCD will auto-detect and deploy to EKS"
+          fi
 
       # ── ArgoCD SYNC ─────────────────────────
-      # ✅ FIX: Sudo access add kiya hai binary permissions ke liye
       
       - name: ArgoCD — Force Sync
         if: success()
