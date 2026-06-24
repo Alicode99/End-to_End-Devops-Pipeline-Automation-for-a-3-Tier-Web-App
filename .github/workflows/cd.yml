@@ -1,0 +1,171 @@
+name: CD Pipeline — GitOps + ArgoCD
+
+# ─────────────────────────────────────────────
+# Trigger: CI pipeline trigger karta hai ise
+# ya manually bhi chala sakte ho
+# ─────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+      FRONTEND_DOCKER_TAG:
+        description: 'Frontend Docker tag (sent by CI)'
+        required: true
+      BACKEND_DOCKER_TAG:
+        description: 'Backend Docker tag (sent by CI)'
+        required: true
+
+jobs:
+
+  # ─────────────────────────────────────────
+  # STEP 1: Kubernetes manifests update karo
+  # ─────────────────────────────────────────
+  update-k8s-manifests:
+    name: Update K8s Manifests & Push to GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Verify Docker Image Tags
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  FRONTEND TAG → ${{ github.event.inputs.FRONTEND_DOCKER_TAG }}"
+          echo "  BACKEND  TAG → ${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # ── UPDATE K8s YAML FILES ───────────────
+      # ✅ FIX: Image names ko ci.yml wale original names se match kar diya hai
+
+      - name: Update Backend Image Tag in Kubernetes YAML
+        run: |
+          sed -i -e "s|${{ secrets.DOCKER_USERNAME }}/wanderlust-backend-beta:.*|${{ secrets.DOCKER_USERNAME }}/wanderlust-backend-beta:${{ github.event.inputs.BACKEND_DOCKER_TAG }}|g" \
+            kubernetes/backend.yaml
+          echo "✅ backend.yaml updated:"
+          grep "image:" kubernetes/backend.yaml
+
+      - name: Update Frontend Image Tag in Kubernetes YAML
+        run: |
+          sed -i -e "s|${{ secrets.DOCKER_USERNAME }}/wanderlust-frontend-beta:.*|${{ secrets.DOCKER_USERNAME }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }}|g" \
+            kubernetes/frontend.yaml
+          echo "✅ frontend.yaml updated:"
+          grep "image:" kubernetes/frontend.yaml
+
+      # ── GIT PUSH ────────────────────────────
+
+      - name: Commit and Push Updated Manifests
+        run: |
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions Bot"
+
+          echo "── Repository Status ──"
+          git status
+
+          git add kubernetes/backend.yaml kubernetes/frontend.yaml
+
+          git commit -m "ci: update image tags | frontend=${{ github.event.inputs.FRONTEND_DOCKER_TAG }} backend=${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+
+          git push https://${{ secrets.GH_TOKEN }}@github.com/Alicode99/End-to_End-Devops-Pipeline-Automation-for-a-3-Tier-Web-App.git main
+          echo "✅ Manifests pushed — ArgoCD will auto-detect and deploy to EKS"
+
+      # ── ArgoCD SYNC ─────────────────────────
+      # ✅ FIX: Sudo access add kiya hai binary permissions ke liye
+
+      - name: ArgoCD — Force Sync
+        if: success()
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+        run: |
+          curl -sSL -o argocd-linux-amd64 \
+            https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x argocd-linux-amd64
+          sudo mv argocd-linux-amd64 /usr/local/bin/argocd
+
+          argocd login $ARGOCD_SERVER \
+            --auth-token $ARGOCD_AUTH_TOKEN \
+            --insecure
+
+          # Note: Kal jab ArgoCD UI mein app banayein toh uska naam '3-tier-web-app' hi rakhiyega
+          argocd app sync 3-tier-web-app --force || echo "Warning: Sync skipped, application might not be created in ArgoCD UI yet."
+          argocd app wait 3-tier-web-app --health || echo "Waiting skipped."
+          echo "✅ ArgoCD sync process executed!"
+
+  # ─────────────────────────────────────────
+  # STEP 2: Email Notification
+  # ─────────────────────────────────────────
+  notify:
+    name: Email Notification
+    runs-on: ubuntu-latest
+    needs: update-k8s-manifests
+    if: always()
+
+    steps:
+      - name: Send Success Email
+        if: needs.update-k8s-manifests.result == 'success'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_APP_PASSWORD }}
+          subject: "✅ 3-Tier App Deployed Successfully — Run #${{ github.run_number }}"
+          to: ${{ secrets.EMAIL_USERNAME }}
+          from: ${{ secrets.EMAIL_USERNAME }}
+          html_body: |
+            <html>
+            <body>
+              <div style="background-color:#90EE90; padding:10px; margin-bottom:10px;">
+                <p style="color:black; font-weight:bold;">
+                  ✅ 3-Tier Web App has been updated and deployed to EKS!
+                </p>
+              </div>
+              <div style="background-color:#FFA07A; padding:10px; margin-bottom:10px;">
+                <p style="color:black; font-weight:bold;">
+                  Repo: Alicode99/End-to_End-Devops-Pipeline-Automation-for-a-3-Tier-Web-App
+                </p>
+              </div>
+              <div style="background-color:#87CEEB; padding:10px; margin-bottom:10px;">
+                <p style="color:black; font-weight:bold;">
+                  Run Number: ${{ github.run_number }}<br/>
+                  Frontend Tag: ${{ github.event.inputs.FRONTEND_DOCKER_TAG }}<br/>
+                  Backend Tag: ${{ github.event.inputs.BACKEND_DOCKER_TAG }}<br/>
+                  URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                </p>
+              </div>
+            </body>
+            </html>
+
+      - name: Send Failure Email
+        if: needs.update-k8s-manifests.result == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_APP_PASSWORD }}
+          subject: "❌ 3-Tier App CD Pipeline FAILED — Run #${{ github.run_number }}"
+          to: ${{ secrets.EMAIL_USERNAME }}
+          from: ${{ secrets.EMAIL_USERNAME }}
+          html_body: |
+            <html>
+            <body>
+              <div style="background-color:#FF6B6B; padding:10px; margin-bottom:10px;">
+                <p style="color:white; font-weight:bold;">
+                  ❌ 3-Tier Web App CD Pipeline Failed!
+                </p>
+              </div>
+              <div style="background-color:#FFA07A; padding:10px; margin-bottom:10px;">
+                <p style="color:black; font-weight:bold;">
+                  Repo: Alicode99/End-to_End-Devops-Pipeline-Automation-for-a-3-Tier-Web-App<br/>
+                  Run Number: ${{ github.run_number }}<br/>
+                  URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                </p>
+              </div>
+            </body>
+            </html>

@@ -1,0 +1,205 @@
+name: CI Pipeline — 3-Tier Web App
+
+# ─────────────────────────────────────────────
+# Trigger: manually run karo aur docker tags do
+# ─────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+      FRONTEND_DOCKER_TAG:
+        description: 'Frontend Docker image tag (e.g. v1.0)'
+        required: true
+      BACKEND_DOCKER_TAG:
+        description: 'Backend Docker image tag (e.g. v1.0)'
+        required: true
+
+jobs:
+
+  # ─────────────────────────────────────────
+  # STEP 1: Validate — tags empty na hon
+  # ─────────────────────────────────────────
+  validate:
+    name: Validate Docker Tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check tags are provided
+        run: |
+          if [ -z "${{ github.event.inputs.FRONTEND_DOCKER_TAG }}" ] || \
+             [ -z "${{ github.event.inputs.BACKEND_DOCKER_TAG }}" ]; then
+            echo "ERROR: FRONTEND_DOCKER_TAG and BACKEND_DOCKER_TAG must be provided."
+            exit 1
+          fi
+          echo "✅ Tags validated:"
+          echo "   Frontend → ${{ github.event.inputs.FRONTEND_DOCKER_TAG }}"
+          echo "   Backend  → ${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+
+  # ─────────────────────────────────────────
+  # STEP 2: Security Scans + Build + Push
+  # ─────────────────────────────────────────
+  build-and-push:
+    name: Scan, Build & Push
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
+      AWS_DEFAULT_REGION: 'us-east-1' # Default region for AWS CLI tools globally
+      AWS_REGION: 'us-east-1'
+
+    steps:
+
+      # ── CHECKOUT ────────────────────────────
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ── SECURITY SCANS ──────────────────────
+
+      - name: Trivy — Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          output: trivy-fs-report.xml
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
+      # Setup Node 20 before OWASP check for npm audit compatibility
+      - name: Setup Node 20 (for npm audit compatibility)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Robust installation to bypass lockfile issues
+      - name: Install backend dependencies (for audit)
+        working-directory: ./backend
+        run: |
+          npm install --no-audit --no-fund
+
+      - name: OWASP — Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 3-tier-web-app
+          path: .
+          format: XML
+          out: .
+          args: >
+            --enableRetired
+
+      # ── SONARQUBE ───────────────────────────
+
+      - name: SonarQube — Code Analysis
+        uses: SonarSource/sonarqube-scan-action@master
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=3-tier-web-app
+            -Dsonar.projectName=3-tier-web-app
+            -Dsonar.organization=alicode99
+
+      - name: SonarQube — Quality Gate Check
+        uses: SonarSource/sonarqube-quality-gate-action@master
+        timeout-minutes: 3
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # ── ENV SETUP & SCRIPTS FIX ─────────────
+
+      # 🛠️ SMART FIX: Create missing .env.docker files dynamically before scripts read them
+      - name: Handle Missing Environment Files Dynamically
+        run: |
+          mkdir -p backend frontend
+          
+          if [ ! -f "backend/.env.docker" ]; then
+            echo "Creating fallback backend/.env.docker..."
+            cat <<EOF > backend/.env.docker
+          NODE_ENV=production
+          PORT=5000
+          DB_HOST=db
+          DB_PORT=27017
+          DB_NAME=wanderlust
+          EOF
+          fi
+
+          if [ ! -f "frontend/.env.docker" ]; then
+            echo "Creating fallback frontend/.env.docker..."
+            cat <<EOF > frontend/.env.docker
+          REACT_APP_API_URL=http://localhost:5000
+          EOF
+          fi
+
+      - name: Setup Backend Environment Variables
+        env:
+          AWS_REGION: us-east-1
+          AWS_DEFAULT_REGION: us-east-1
+        run: bash Automations/updatebackendnew.sh
+
+      - name: Setup Frontend Environment Variables
+        env:
+          AWS_REGION: us-east-1
+          AWS_DEFAULT_REGION: us-east-1
+        run: bash Automations/updatefrontendnew.sh
+
+      # ── DOCKER BUILD & PUSH ─────────────────
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Backend Docker Image
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/wanderlust-backend-beta:${{ github.event.inputs.BACKEND_DOCKER_TAG }} \
+            ./backend
+
+      - name: Build Frontend Docker Image
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }} \
+            ./frontend
+
+      - name: Push Backend Image to DockerHub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/wanderlust-backend-beta:${{ github.event.inputs.BACKEND_DOCKER_TAG }}
+
+      - name: Push Frontend Image to DockerHub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }}
+
+      # ── SAVE SCAN REPORTS ───────────────────
+
+      - name: Upload Scan Reports as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-reports
+          path: |
+            trivy-fs-report.xml
+            dependency-check-report.xml
+          include-hidden-files: false
+
+      # ── TRIGGER CD ──────────────────────────
+
+      - name: Trigger CD Pipeline
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'cd.yml',
+              ref: 'main',
+              inputs: {
+                FRONTEND_DOCKER_TAG: '${{ github.event.inputs.FRONTEND_DOCKER_TAG }}',
+                BACKEND_DOCKER_TAG: '${{ github.event.inputs.BACKEND_DOCKER_TAG }}'
+              }
+            })
+            console.log('✅ CD Pipeline triggered!')

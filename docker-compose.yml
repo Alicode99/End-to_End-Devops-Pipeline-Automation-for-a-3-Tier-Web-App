@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  # ── DATABASE: MONGODB ─────────────────────────
+  mongodb:
+    container_name: mongo-service
+    image: mongo:latest
+    volumes:
+      - mongo-data:/data/db    # ✅ FIX: Named volume ka sahi path use kiya hai production cache ke liye
+    ports:
+      - "27017:27017"
+
+  # ── BACKEND SERVICE ───────────────────────────
+  backend:
+    container_name: backend
+    build: ./backend
+    env_file:
+      - ./backend/.env.docker   # Pakka kar lein ke yeh file folder mein mojood ho
+    ports:
+      - "31100:8080"            # Local port 31100 par access hoga
+    depends_on:
+      - mongodb
+      - redis                  # Backend database ke sath redis par bhi depend karta hai
+
+  # ── FRONTEND SERVICE ──────────────────────────
+  frontend:
+    container_name: frontend
+    build: ./frontend
+    env_file:
+      - ./frontend/.env.docker  # Pakka kar lein ke yeh file folder mein mojood ho
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend                 # Frontend backend ke chalne ke baad chalna chahiye
+
+  # ── CACHE: REDIS ──────────────────────────────
+  redis:
+    container_name: redis-service
+    restart: unless-stopped
+    image: redis:7.0.5-alpine 
+    ports:
+      - "6379:6379"            # ✅ Expose ki bajay port map kar di taake debugging aasan ho
+    depends_on:
+      - mongodb
+
+# ── VOLUMES DEFINITION ──────────────────────────
+volumes:
+  mongo-data:                  # ✅ FIX: Sahi volume name map kar diya hai

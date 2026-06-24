@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+  namespace: wanderlust
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # ✅ selector lagaya taake yeh direct upar wale mongo-pv se hi ja kar hath milaye
+  selector:
+    matchLabels:
+      type: amazonEBS
