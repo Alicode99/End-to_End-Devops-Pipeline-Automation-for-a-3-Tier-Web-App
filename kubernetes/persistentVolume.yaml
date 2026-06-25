@@ -3,8 +3,6 @@ kind: PersistentVolume
 metadata:
   name: mongo-pv
   namespace: wanderlust
-  labels:
-    type: amazonEBS        # Label de diya taake PVC easily match kar sake
 spec:
   capacity:
     storage: 5Gi
@@ -12,7 +10,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  # ✅ FIX: hostPath hata kar AWS Elastic Block Store lagaya hai
-  awsElasticBlockStore:
-    volumeID: "vol-0abcd1234abcd1234"  # 👈 Yahan apni asli AWS Volume ID likhein
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: vol-087b98a18f3c673e3
     fsType: ext4
