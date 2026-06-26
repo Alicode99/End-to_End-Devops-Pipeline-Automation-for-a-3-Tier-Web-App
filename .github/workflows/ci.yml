@@ -161,6 +161,7 @@ jobs:
       - name: Build Frontend Docker Image
         run: |
           docker build \
+            --build-arg VITE_API_PATH="http://a5cef5d5dd383412c978db2733f0f777-1962010384.us-east-1.elb.amazonaws.com:8080" \
             -t ${{ secrets.DOCKER_USERNAME }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }} \
             ./frontend
 

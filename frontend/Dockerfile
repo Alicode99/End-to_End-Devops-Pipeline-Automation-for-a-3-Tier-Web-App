@@ -15,6 +15,10 @@ COPY . .
 # Environment file set karna build se pehle (agar runtime par chahiye)
 COPY .env.docker .env.local
 
+# 👇 1. YAHAN HUMNE VARIABLE INJECT KIYA HAI (Yeh do lines add ki hain)
+ARG VITE_API_PATH
+ENV VITE_API_PATH=$VITE_API_PATH
+
 # ✅ Production build banana (Yeh 'dist' ya 'build' folder generate karega)
 RUN npm run build
 
@@ -22,7 +26,6 @@ RUN npm run build
 FROM nginx:alpine
 
 # ✅ Purane node_modules ke bajay sirf tayar shuda HTML/CSS/JS files copy karna
-# Note: Agar aapka project Vite par hai toh 'dist' hoga, agar Create-React-App hai toh 'build' hoga.
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 
 # Default Nginx HTTP Port expose karna
