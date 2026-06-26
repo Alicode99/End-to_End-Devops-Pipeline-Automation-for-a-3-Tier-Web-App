@@ -16,6 +16,8 @@ spec:
       labels:
         app: mongo
     spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: us-east-1a
       containers:
         - name: mongo
           image: mongo
