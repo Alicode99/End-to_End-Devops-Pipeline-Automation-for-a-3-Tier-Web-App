@@ -9,7 +9,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  # ✅ selector lagaya taake yeh direct upar wale mongo-pv se hi ja kar hath milaye
-  selector:
-    matchLabels:
-      type: amazonEBS
+  volumeName: mongo-pv
