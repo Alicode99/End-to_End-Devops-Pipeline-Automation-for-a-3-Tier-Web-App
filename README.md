@@ -1,6 +1,6 @@
 # End-to-End DevOps Pipeline Automation for a 3-Tier Web Application
 
-A production-grade CI/CD pipeline built as a Final Year Project (FYP) that automates the complete software delivery lifecycle — from code commit to live deployment on AWS EKS — using modern DevOps tools and GitOps principles.
+A production-grade CI/CD pipeline  that automates the complete software delivery lifecycle — from code commit to live deployment on AWS EKS — using modern DevOps tools and GitOps principles.
 
 ---
 
