@@ -1,9 +1,5 @@
 name: CD Pipeline — GitOps + ArgoCD
 
-# ─────────────────────────────────────────────
-# Trigger: CI pipeline trigger karta hai ise
-# ya manually bhi chala sakte ho
-# ─────────────────────────────────────────────
 on:
   workflow_dispatch:
     inputs:
@@ -16,9 +12,6 @@ on:
 
 jobs:
 
-  # ─────────────────────────────────────────
-  # STEP 1: Kubernetes manifests update karo
-  # ─────────────────────────────────────────
   update-k8s-manifests:
     name: Update K8s Manifests & Push to GitHub
     runs-on: ubuntu-latest
@@ -36,9 +29,6 @@ jobs:
           echo "  FRONTEND TAG → ${{ github.event.inputs.FRONTEND_DOCKER_TAG }}"
           echo "  BACKEND  TAG → ${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      # ── UPDATE K8s YAML FILES ───────────────
-      # Smart Validation lagayi hai taake pata chale file exist karti bhi hai ya nahi
 
       - name: Update Backend Image Tag in Kubernetes YAML
         run: |
@@ -62,9 +52,6 @@ jobs:
           echo "✅ frontend.yaml updated:"
           grep "image:" kubernetes/frontend.yaml
 
-      # ── GIT PUSH WITH CONDITIONAL FIX ───────
-      # 🛠️ SMART FIX: Agar tags same honge aur koi change nahi hoga, toh yeh crash hone ke bajay bypass kar dega.
-
       - name: Commit and Push Updated Manifests
         run: |
           git config user.email "github-actions@github.com"
@@ -76,15 +63,13 @@ jobs:
           git add kubernetes/backend.yaml kubernetes/frontend.yaml
 
           if git diff --cached --quiet; then
-            echo "⚠️ No changes detected in manifests (already up-to-date with these tags). Skipping commit."
+            echo "⚠️ No changes detected — skipping commit."
           else
-            git commit -m "ci: update image tags | frontend=${{ github.event.inputs.FRONTEND_DOCKER_TAG }} backend=${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+            git commit -m "ci: update image tags [skip ci] | frontend=${{ github.event.inputs.FRONTEND_DOCKER_TAG }} backend=${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
             git push https://${{ secrets.GH_TOKEN }}@github.com/Alicode99/End-to_End-Devops-Pipeline-Automation-for-a-3-Tier-Web-App.git main
             echo "✅ Manifests pushed — ArgoCD will auto-detect and deploy to EKS"
           fi
 
-      # ── ArgoCD SYNC ─────────────────────────
-      
       - name: ArgoCD — Force Sync
         if: success()
         env:
@@ -94,15 +79,10 @@ jobs:
           curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           chmod +x argocd-linux-amd64
           sudo mv argocd-linux-amd64 /usr/local/bin/argocd
-
-          # No interactive login needed now. It will use env variables directly.
           argocd app sync 3-tier-web-app --force --insecure || echo "Warning: Sync skipped."
           argocd app wait 3-tier-web-app --health --insecure || echo "Waiting skipped."
-          echo "✅ ArgoCD sync process executed flawlessly!"
+          echo "✅ ArgoCD sync process executed!"
 
-  # ─────────────────────────────────────────
-  # STEP 2: Email Notification
-  # ─────────────────────────────────────────
   notify:
     name: Email Notification
     runs-on: ubuntu-latest
