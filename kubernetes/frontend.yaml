@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: alirazaakram/wanderlust-frontend-beta:fae296ce75728d3dada4db7ea6e0c05f09d68db9
+          image: alirazaakram/wanderlust-frontend-beta:54f355d5efc864e6b2debdf0950b14e165dc48d5
           ports:
             - containerPort: 5173
 ---
