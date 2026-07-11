@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: alirazaakram/wanderlust-backend-beta:19745ee4ec952d61cff20bced477162a9afa07e4
+          image: alirazaakram/wanderlust-backend-beta:5a8f525700ccc93fc88ee455560d7a713d6fcf2f
           ports:
             - containerPort: 8080
 ---
