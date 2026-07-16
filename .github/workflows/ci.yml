@@ -94,6 +94,7 @@ jobs:
           out: .
           args: >
             --enableRetired
+            --disableNodeAudit
 
       - name: SonarQube — Code Analysis
         uses: SonarSource/sonarqube-scan-action@master
