@@ -47,12 +47,12 @@ export default function BlogFeed() {
       <div className="-mx-4 flex flex-wrap">
         <div className="w-full p-4 md:w-2/3">
           <div className="-mb-1 cursor-text text-base tracking-wide text-slate-500 dark:text-dark-tertiary">
-            What's hot?
+            Project Highlights
           </div>
           <h1 className="mb-2 cursor-text text-xl font-semibold dark:text-dark-primary">
             {selectedCategory === 'featured'
-              ? 'Featured Posts'
-              : `Posts related to "${selectedCategory}"`}
+              ? 'Featured Project Logs'
+              : `Logs tagged with "${selectedCategory}"`}
           </h1>
           <div className="flex flex-col gap-6">
             {posts.length === 0 || loading == true
@@ -67,10 +67,10 @@ export default function BlogFeed() {
         <div className="w-full p-4 md:w-1/3">
           <div className="mb-6">
             <div className="-mb-1 cursor-text text-base tracking-wide text-light-tertiary dark:text-dark-tertiary">
-              Discover by topic
+              Filter by Tech Stack
             </div>
             <h2 className="mb-2 cursor-text text-xl font-semibold dark:text-dark-primary">
-              Categories
+              Technologies & Tools
             </h2>
             <div className="flex flex-wrap gap-3 dark:rounded-lg dark:bg-dark-card dark:p-3">
               {categories.map((category) => (
@@ -89,10 +89,10 @@ export default function BlogFeed() {
           </div>
           <div>
             <div className="-mb-1 cursor-text text-base tracking-wide text-slate-500 dark:text-dark-tertiary">
-              What's new?
+              Recent Updates
             </div>
             <h2 className="mb-2 cursor-text text-xl font-semibold dark:text-dark-primary">
-              Latest Posts
+              Latest Activity Logs
             </h2>
             <div className="flex flex-col gap-4">
               {latestPosts.length === 0

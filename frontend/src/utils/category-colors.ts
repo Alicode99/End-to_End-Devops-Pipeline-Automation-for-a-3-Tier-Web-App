@@ -1,17 +1,21 @@
-type CategoryColors = Map<string, [string, string]>;
+export const categories = [
+  'Docker',
+  'Kubernetes',
+  'AWS',
+  'CI/CD',
+  'ArgoCD',
+  'React',
+  'Node.js',
+  'DevOps'
+];
 
-const categoryColors: CategoryColors = new Map([
-  ['Travel', ['bg-pink-200 dark:bg-pink-900', 'bg-pink-500/80']],
-  ['Nature', ['bg-green-200 dark:bg-green-900', 'bg-green-500/80']],
-  ['City', ['bg-yellow-200 dark:bg-yellow-900', 'bg-yellow-500/80']],
-  ['Adventure', ['bg-blue-200 dark:bg-blue-900', 'bg-blue-500/80']],
-  ['Beaches', ['bg-purple-200 dark:bg-purple-900', 'bg-purple-500/80']],
-  ['Landmarks', ['bg-red-200 dark:bg-red-900', 'bg-red-500/80']],
-]);
-
-export const categories: string[] = Array.from(categoryColors.keys());
-
-export function getCategoryColors(category: string): [string, string] {
-  const colorTuple: [string, string] | undefined = categoryColors.get(category);
-  return colorTuple ?? ['bg-cyan-200 dark:bg-cyan-900', 'bg-cyan-500/80'];
-}
+export const categoryColors: Record<string, string> = {
+  Docker: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  Kubernetes: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+  AWS: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  'CI/CD': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  ArgoCD: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  React: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
+  'Node.js': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+  DevOps: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+};
