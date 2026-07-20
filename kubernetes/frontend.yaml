@@ -21,6 +21,11 @@ spec:
           image: alirazaakram/wanderlust-frontend-beta:02414521201b330f88febca61cd7b526f4c57f1f
           ports:
             - containerPort: 5173
+          env:
+            - name: VITE_API_URL
+              value: "http://a69ecef3d4d6d4000ac5e6b7ce408443-508755135.us-east-1.elb.amazonaws.com:8080"
+            - name: REACT_APP_API_URL
+              value: "http://a69ecef3d4d6d4000ac5e6b7ce408443-508755135.us-east-1.elb.amazonaws.com:8080"
 ---
 apiVersion: v1
 kind: Service
@@ -33,5 +38,5 @@ spec:
     app: frontend
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 5173
       protocol: TCP
