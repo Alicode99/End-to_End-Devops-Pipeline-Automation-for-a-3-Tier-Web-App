@@ -20,7 +20,7 @@ spec:
         - name: frontend
           image: alirazaakram/wanderlust-frontend-beta:0f190a7383d9f2534a1af53707f72a861ddfb696
           ports:
-            - containerPort: 5173
+            - containerPort: 80
           env:
             - name: VITE_API_URL
               value: "http://a69ecef3d4d6d4000ac5e6b7ce408443-508755135.us-east-1.elb.amazonaws.com:8080"
